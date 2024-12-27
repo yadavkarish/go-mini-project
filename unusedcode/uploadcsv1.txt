@@ -1,0 +1,82 @@
+/*some or records are fetch but ide and post man shut down unexpectatly due to
+Root Causes:
+1.High Goroutine Count: Too many goroutines are created for concurrent record processing, potentially exhausting system resources.
+2.Database Connection Pool Issues: Your database library (pgx with gorm) is running out of connections, likely because the pool size is insufficient for the high number of concurrent operations.
+3.Network Resolver Overload: The stack trace shows net.(*Resolver).lookupIP, which indicates that DNS lookups or database host resolution might be failing under load.
+4.Improper Error Handling: Failures in one part of the system might be cascading due to insufficient error checks and retries.*/
+
+// func (s *Service) UploadCSV(ctx *gin.Context) {
+// 	// Get the file from the form
+// 	file, header, err := ctx.Request.FormFile("file")
+// 	if err != nil {
+// 		log.Error("Failed to get file: ", err)
+// 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get file"})
+// 		return
+// 	}
+// 	defer file.Close()
+
+// 	// Ensure the file has a .csv extension
+// 	if filepath.Ext(header.Filename) != ".csv" {
+// 		log.Warn("Invalid file type uploaded")
+// 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Only CSV files are allowed."})
+// 		return
+// 	}
+
+// 	// Open the CSV reader
+// 	csvReader := csv.NewReader(file)
+
+// 	// Read and process the file line by line
+// 	var wg sync.WaitGroup
+// 	recordChan := make(chan []string, 1000) // Buffer for concurrent processing
+
+// 	// Goroutine to process records
+// 	go func() {
+// 		for record := range recordChan {
+// 			wg.Add(1)
+// 			go func(record []string) {
+// 				defer wg.Done()
+// 				// Validate and insert records
+// 				recordData := models.CSV{
+// 					SiteID:                parseInt(record[0]),
+// 					FxiletID:              parseInt(record[1]),
+// 					Name:                  record[2],
+// 					Criticality:           record[3],
+// 					RelevantComputerCount: parseInt(record[4]),
+// 				}
+
+// 				// Save to DB
+// 				if err := s.Repo.AddRecord(recordData); err != nil {
+// 					log.Error("Error saving record: ", err)
+// 				} else {
+// 					log.Info("Record saved: ", recordData)
+// 				}
+// 			}(record)
+// 		}
+// 	}()
+
+// 	// Read CSV rows and send to recordChan
+// 	skipHeader := true
+// 	for {
+// 		record, err := csvReader.Read()
+// 		if err != nil {
+// 			if err == csv.ErrFieldCount || err == io.EOF {
+// 				break
+// 			}
+// 			log.Error("Error reading CSV row: ", err)
+// 			continue
+// 		}
+
+// 		// Skip the header row
+// 		if skipHeader {
+// 			skipHeader = false
+// 			continue
+// 		}
+
+// 		recordChan <- record
+// 	}
+
+// 	close(recordChan) // Close the channel to signal end of input
+// 	wg.Wait()         // Wait for all goroutines to finish
+
+// 	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "File uploaded and records stored"})
+// }
