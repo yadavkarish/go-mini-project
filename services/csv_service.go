@@ -53,16 +53,17 @@ func processRecords(recordChan <-chan []string, batchSize int, s *Service, wg *s
 
 	for record := range recordChan {
 		recordData := models.User{
-			FirstName:  record[0],
-			LastName:   record[1],
-			Email:      record[2],
-			Age:        parseInt(record[3]),
-			Gender:     record[4],
-			Department: record[5],
-			Company:    record[6],
-			Salary:     parseFloat(record[7]),
-			DateJoined: record[8],
-			IsActive:   parseBool(record[9]),
+			Id:         parseInt(record[0]),
+			FirstName:  record[1],
+			LastName:   record[2],
+			Email:      record[3],
+			Age:        parseInt(record[4]),
+			Gender:     record[5],
+			Department: record[6],
+			Company:    record[7],
+			Salary:     parseFloat(record[8]),
+			DateJoined: record[9],
+			IsActive:   parseBool(record[10]),
 		}
 
 		batch = append(batch, recordData)
@@ -211,7 +212,7 @@ func (s *Service) QueryUpdates(ctx *gin.Context) {
 
 	// Build query parameters
 	queryParams := map[string]interface{}{
-		"name": keyword,
+		"first_name": keyword,
 	}
 
 	// Fetch matching records with pagination
@@ -227,7 +228,7 @@ func (s *Service) QueryUpdates(ctx *gin.Context) {
 
 	// Fetch total count for metadata
 	var total int64
-	if err := db.Model(&models.User{}).Where("LOWER(name) LIKE ?", "%"+strings.ToLower(keyword)+"%").Count(&total).Error; err != nil {
+	if err := db.Model(&models.User{}).Where("LOWER(first_name) LIKE ?", "%"+strings.ToLower(keyword)+"%").Count(&total).Error; err != nil {
 		utils.LogError("Failed to count records", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
