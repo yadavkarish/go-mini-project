@@ -5,6 +5,7 @@ import (
 	"csv-microservice/models"
 	"errors"
 	"fmt"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -13,9 +14,9 @@ import (
 type RepositoryInterface interface {
 	InsertRecord(ctx context.Context, record interface{}) error
 	DeleteRecord(ctx context.Context, id int) error
-	QueryRecords(ctx context.Context, queryParams map[string]interface{}) ([]interface{}, error)
-	AddRecord(record models.CSV) error
-	BulkInsert(records []models.CSV) error
+	QueryRecords(ctx context.Context, queryParams map[string]interface{}, offset, limit int) ([]models.User, error)
+	AddRecord(record models.User) error
+	BulkInsert(records []models.User) error
 }
 
 // Repository implementation
@@ -36,22 +37,26 @@ func (r *Repository) DeleteRecord(ctx context.Context, id int) error {
 	return errors.ErrUnsupported
 }
 
-func (r *Repository) QueryRecords(ctx context.Context, queryParams map[string]interface{}) ([]interface{}, error) {
-	var results []interface{}
-	err := r.Db.WithContext(ctx).Where(queryParams).Find(&results).Error
+func (r *Repository) QueryRecords(ctx context.Context, queryParams map[string]interface{}, offset, limit int) ([]models.User, error) {
+	var results []models.User
+	query := r.Db.WithContext(ctx)
+
+	// Apply filters dynamically
+	for key, value := range queryParams {
+		if key == "first_name" {
+			query = query.Where("LOWER(first_name) LIKE ?", "%"+strings.ToLower(value.(string))+"%")
+		} else {
+			query = query.Where(key+" = ?", value)
+		}
+	}
+
+	// Apply pagination
+	err := query.Offset(offset).Limit(limit).Find(&results).Error
 	return results, err
 }
 
-// AddRecord adds a new record to the database
-//
-//	func (r *Repository) AddRecord(record models.CSV) error {
-//		if err := r.Db.Create(&record).Error; err != nil {
-//			utils.LogError("Failed to insert record into database", err)
-//			return err
-//		}
-//		return nil
-//	}
-func (r *Repository) AddRecord(record models.CSV) error {
+// unused method
+func (r *Repository) AddRecord(record models.User) error {
 	if r.Db == nil {
 		return fmt.Errorf("database connection is nil")
 	}
@@ -62,7 +67,7 @@ func (r *Repository) AddRecord(record models.CSV) error {
 }
 
 // BulkInsert inserts multiple records in a single transaction.
-func (r *Repository) BulkInsert(records []models.CSV) error {
+func (r *Repository) BulkInsert(records []models.User) error {
 	if len(records) == 0 {
 		return nil
 	}
