@@ -43,8 +43,8 @@ func (r *Repository) QueryRecords(ctx context.Context, queryParams map[string]in
 
 	// Apply filters dynamically
 	for key, value := range queryParams {
-		if key == "name" {
-			query = query.Where("LOWER(name) LIKE ?", "%"+strings.ToLower(value.(string))+"%")
+		if key == "first_name" {
+			query = query.Where("LOWER(first_name) LIKE ?", "%"+strings.ToLower(value.(string))+"%")
 		} else {
 			query = query.Where(key+" = ?", value)
 		}
