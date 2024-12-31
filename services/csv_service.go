@@ -3,6 +3,7 @@ package services
 import (
 	"csv-microservice/models"
 	repository "csv-microservice/repositories"
+	"csv-microservice/utils"
 	"encoding/csv"
 	"io"
 	"net/http"
@@ -38,7 +39,7 @@ var log = logrus.New()
 // Initialize PostgreSQL DB connection (Using GORM)
 func InitDatabase(database *gorm.DB) {
 	db = database
-	db.AutoMigrate(&models.CSV{})
+	db.AutoMigrate(&models.User{})
 }
 
 func NewService(repo repository.RepositoryInterface) *Service {
@@ -48,15 +49,20 @@ func NewService(repo repository.RepositoryInterface) *Service {
 // CSV Upload and Parsing using Goroutines
 func processRecords(recordChan <-chan []string, batchSize int, s *Service, wg *sync.WaitGroup) {
 	defer wg.Done()
-	var batch []models.CSV
+	var batch []models.User
 
 	for record := range recordChan {
-		recordData := models.CSV{
-			SiteID:                parseInt(record[0]),
-			FxiletID:              parseInt(record[1]),
-			Name:                  record[2],
-			Criticality:           record[3],
-			RelevantComputerCount: parseInt(record[4]),
+		recordData := models.User{
+			FirstName:  record[0],
+			LastName:   record[1],
+			Email:      record[2],
+			Age:        parseInt(record[3]),
+			Gender:     record[4],
+			Department: record[5],
+			Company:    record[6],
+			Salary:     parseFloat(record[7]),
+			DateJoined: record[8],
+			IsActive:   parseBool(record[9]),
 		}
 
 		batch = append(batch, recordData)
@@ -133,11 +139,113 @@ func (s *Service) ListAllEntries(ctx *gin.Context) {
 }
 
 func (s *Service) ListEntriesByPages(ctx *gin.Context) {
-	// Implementation
+	// Query parameters for pagination
+	pageStr := ctx.DefaultQuery("page", "1")    // Default to page 1
+	limitStr := ctx.DefaultQuery("limit", "10") // Default limit to 10 items per page
+
+	// Convert pagination parameters to integers
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 10
+	}
+
+	// Calculate offset for the database query
+	offset := (page - 1) * limit
+
+	// Fetch paginated data from the database
+	var entries []models.User
+	result := db.Offset(offset).Limit(limit).Find(&entries)
+	// fmt.Println(result)
+	if result.Error != nil {
+		utils.LogError("Error fetching data from database", result.Error)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Failed to fetch data from database",
+		})
+		return
+	}
+
+	// Fetch total count for metadata
+	var totalCount int64
+	db.Model(&models.User{}).Count(&totalCount)
+
+	// Return paginated data
+	ctx.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   entries,
+		"meta": gin.H{
+			"page":  page,
+			"limit": limit,
+			"total": totalCount,
+		},
+	})
+
 }
 
 func (s *Service) QueryUpdates(ctx *gin.Context) {
-	// Implementation
+	keyword := ctx.Query("keyword")
+	if keyword == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Keyword is required",
+		})
+		return
+	}
+
+	// Parse pagination parameters
+	pageStr := ctx.DefaultQuery("page", "1")
+	limitStr := ctx.DefaultQuery("limit", "50") // Default to 50 items per page
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 50 // Restrict max items per page to 100
+	}
+	offset := (page - 1) * limit
+
+	// Build query parameters
+	queryParams := map[string]interface{}{
+		"name": keyword,
+	}
+
+	// Fetch matching records with pagination
+	results, err := s.Repo.QueryRecords(ctx, queryParams, offset, limit)
+	if err != nil {
+		utils.LogError("Failed to fetch records from database", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Failed to fetch records",
+		})
+		return
+	}
+
+	// Fetch total count for metadata
+	var total int64
+	if err := db.Model(&models.User{}).Where("LOWER(name) LIKE ?", "%"+strings.ToLower(keyword)+"%").Count(&total).Error; err != nil {
+		utils.LogError("Failed to count records", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Failed to fetch records count",
+		})
+		return
+	}
+
+	// Return results with pagination metadata
+	ctx.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   results,
+		"meta": gin.H{
+			"page":  page,
+			"limit": limit,
+			"total": total,
+		},
+	})
 }
 
 func (s *Service) AddEntries(ctx *gin.Context) {
@@ -156,4 +264,19 @@ func (s *Service) GetLogs(ctx *gin.Context) {
 func parseInt(str string) int {
 	val, _ := strconv.Atoi(strings.TrimSpace(str))
 	return val
+}
+
+// Helper function to parse a float64 from a string
+func parseFloat(value string) float64 {
+	num, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0.0 // Default value if parsing fails
+	}
+	return num
+}
+
+// Helper function to parse a boolean from a string
+func parseBool(value string) bool {
+	// For simplicity, let's return true if the string is "true" (case insensitive)
+	return value == "true" || value == "TRUE"
 }
