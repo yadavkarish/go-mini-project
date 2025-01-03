@@ -31,12 +31,12 @@ func (c *Controller) SearchRecords(ctx *gin.Context) {
 	c.Service.QueryUpdates(ctx)
 }
 
-func (c *Controller) AddEntries(ctx *gin.Context) {
-	c.Service.AddEntries(ctx)
+func (c *Controller) AddRecord(ctx *gin.Context) {
+	c.Service.AddRecord(ctx)
 }
 
 func (c *Controller) DeleteRecord(ctx *gin.Context) {
-	c.Service.DeleteUpdate(ctx)
+	c.Service.DeleteRecord(ctx)
 }
 
 func (c *Controller) GetLogs(ctx *gin.Context) {

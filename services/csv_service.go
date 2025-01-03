@@ -23,8 +23,8 @@ type ServiceInterface interface {
 	ListAllEntries(ctx *gin.Context)
 	ListEntriesByPages(ctx *gin.Context)
 	QueryUpdates(ctx *gin.Context)
-	AddEntries(ctx *gin.Context)
-	DeleteUpdate(ctx *gin.Context)
+	AddRecord(ctx *gin.Context)
+	DeleteRecord(ctx *gin.Context)
 	GetLogs(ctx *gin.Context)
 }
 
@@ -249,12 +249,71 @@ func (s *Service) QueryUpdates(ctx *gin.Context) {
 	})
 }
 
-func (s *Service) AddEntries(ctx *gin.Context) {
-	// Implementation
+func (s *Service) AddRecord(ctx *gin.Context) {
+	var user models.User
+
+	// Parse the JSON body into the User struct
+	if err := ctx.ShouldBindJSON(&user); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Invalid request body",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Insert the record into the database
+	err := s.Repo.InsertRecord(ctx, &user)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Failed to add record",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Respond with success
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Record added successfully",
+		"data":    user,
+	})
 }
 
-func (s *Service) DeleteUpdate(ctx *gin.Context) {
-	// Implementation
+func (s *Service) DeleteRecord(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Invalid ID format",
+		})
+		return
+	}
+
+	// Call the repository function to delete the record
+	err = s.Repo.DeleteRecord(ctx, id)
+	if err != nil {
+		if err.Error() == "record not found" {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"status":  "error",
+				"message": "Record not found",
+			})
+		} else {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Failed to delete record",
+			})
+		}
+		return
+	}
+
+	// Respond with success if the deletion was successful
+	ctx.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Record deleted successfully",
+	})
 }
 
 func (s *Service) GetLogs(ctx *gin.Context) {
