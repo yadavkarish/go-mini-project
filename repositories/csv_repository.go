@@ -33,8 +33,15 @@ func (r *Repository) InsertRecord(ctx context.Context, record interface{}) error
 }
 
 func (r *Repository) DeleteRecord(ctx context.Context, id int) error {
-	// return r.Db.WithContext(ctx).Delete(&CSV{}, id).Error
-	return errors.ErrUnsupported
+	// Use the `Delete` method of GORM to remove the record by its ID
+	result := r.Db.WithContext(ctx).Delete(&models.User{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("record not found")
+	}
+	return nil
 }
 
 func (r *Repository) QueryRecords(ctx context.Context, queryParams map[string]interface{}, offset, limit int) ([]models.User, error) {

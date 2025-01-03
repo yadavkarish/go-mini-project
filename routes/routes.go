@@ -12,7 +12,7 @@ func RegisterRoutes(router *gin.Engine, controller *controllers.Controller) {
 	router.GET("/list", controller.ListRecords)
 	router.GET("/listByPages", controller.ListRecordsByPages)
 	router.GET("/search", controller.SearchRecords)
-	router.POST("/add", controller.AddEntries)
+	router.POST("/add", controller.AddRecord)
 	router.DELETE("/delete/:id", controller.DeleteRecord)
 	router.GET("/logs", controller.GetLogs)
 }
