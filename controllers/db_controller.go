@@ -40,5 +40,6 @@ func (c *Controller) DeleteRecord(ctx *gin.Context) {
 }
 
 func (c *Controller) GetLogs(ctx *gin.Context) {
-	c.Service.GetLogs(ctx)
+	// c.Service.GetLogs(ctx)
+	services.GetLogs(ctx)
 }
