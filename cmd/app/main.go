@@ -5,6 +5,7 @@ import (
 	repository "csv-microservice/repositories"
 	"csv-microservice/routes"
 	"csv-microservice/services"
+	"csv-microservice/utils"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +13,7 @@ import (
 
 func main() {
 	// Initialize logger
-	services.InitLogger()
+	utils.InitLogger()
 
 	// Connect to PostgreSQL
 	// dbConnectionString := config.GetDBConnectionString()

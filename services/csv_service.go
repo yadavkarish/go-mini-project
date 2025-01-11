@@ -5,6 +5,7 @@ import (
 	repository "csv-microservice/repositories"
 	"csv-microservice/utils"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -25,7 +26,7 @@ type ServiceInterface interface {
 	QueryUpdates(ctx *gin.Context)
 	AddRecord(ctx *gin.Context)
 	DeleteRecord(ctx *gin.Context)
-	GetLogs(ctx *gin.Context)
+	// GetLogs(ctx *gin.Context)
 }
 
 // Implement ServiceInterface
@@ -88,12 +89,15 @@ func processRecords(recordChan <-chan []string, batchSize int, s *Service, wg *s
 func (s *Service) UploadCSV(ctx *gin.Context) {
 	file, header, err := ctx.Request.FormFile("file")
 	if err != nil {
+		utils.LogError("UploadCSV", "Failed to get file", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get file"})
 		return
 	}
 	defer file.Close()
+	utils.LogInfo("UploadCSV", "Received file: "+header.Filename)
 
 	if filepath.Ext(header.Filename) != ".csv" {
+		utils.LogWarn("UploadCSV", "Invalid file format: "+header.Filename)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Only CSV files are allowed."})
 		return
 	}
@@ -118,7 +122,8 @@ func (s *Service) UploadCSV(ctx *gin.Context) {
 			break
 		}
 		if err != nil {
-			log.Error("Error reading CSV row: ", err)
+			// log.Error("Error reading CSV row: ", err)
+			utils.LogError("UploadCSV", "Error reading CSV row", err)
 			continue
 		}
 		if skipHeader {
@@ -131,6 +136,7 @@ func (s *Service) UploadCSV(ctx *gin.Context) {
 	close(recordChan) // Signal workers to stop
 	wg.Wait()         // Wait for all workers to finish
 
+	utils.LogInfo("UploadCSV", "File processed successfully: "+header.Filename)
 	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": "File uploaded and records stored"})
 }
 
@@ -154,6 +160,7 @@ func (s *Service) ListEntriesByPages(ctx *gin.Context) {
 		limit = 10
 	}
 
+	utils.LogInfo("ListEntriesByPages", fmt.Sprintf("Incoming request with page: %d, limit: %d", page, limit))
 	// Calculate offset for the database query
 	offset := (page - 1) * limit
 
@@ -162,7 +169,7 @@ func (s *Service) ListEntriesByPages(ctx *gin.Context) {
 	result := db.Offset(offset).Limit(limit).Find(&entries)
 	// fmt.Println(result)
 	if result.Error != nil {
-		utils.LogError("Error fetching data from database", result.Error)
+		utils.LogError("ListEntriesByPages", "Error fetching data from database", result.Error)
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Failed to fetch data from database",
@@ -173,6 +180,7 @@ func (s *Service) ListEntriesByPages(ctx *gin.Context) {
 	// Fetch total count for metadata
 	var totalCount int64
 	db.Model(&models.User{}).Count(&totalCount)
+	utils.LogInfo("ListEntriesByPages", fmt.Sprintf("Successfully fetched %d entries for page: %d with limit: %d", len(entries), page, limit))
 
 	// Return paginated data
 	ctx.JSON(http.StatusOK, gin.H{
@@ -185,11 +193,15 @@ func (s *Service) ListEntriesByPages(ctx *gin.Context) {
 		},
 	})
 
+	// Log the response sent to the client
+	utils.LogInfo("ListEntriesByPages", fmt.Sprintf("Response sent for page: %d, limit: %d with total count: %d", page, limit, totalCount))
+
 }
 
 func (s *Service) QueryUpdates(ctx *gin.Context) {
 	keyword := ctx.Query("keyword")
 	if keyword == "" {
+		utils.LogWarn("QueryUpdates", "Keyword is required but not provided")
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Keyword is required",
@@ -210,6 +222,8 @@ func (s *Service) QueryUpdates(ctx *gin.Context) {
 	}
 	offset := (page - 1) * limit
 
+	utils.LogInfo("QueryUpdates", fmt.Sprintf("Request received with keyword: %s, page: %d, limit: %d", keyword, page, limit))
+
 	// Build query parameters
 	queryParams := map[string]interface{}{
 		"first_name": keyword,
@@ -218,7 +232,7 @@ func (s *Service) QueryUpdates(ctx *gin.Context) {
 	// Fetch matching records with pagination
 	results, err := s.Repo.QueryRecords(ctx, queryParams, offset, limit)
 	if err != nil {
-		utils.LogError("Failed to fetch records from database", err)
+		utils.LogError("Error", "Failed to fetch records from database", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Failed to fetch records",
@@ -229,13 +243,16 @@ func (s *Service) QueryUpdates(ctx *gin.Context) {
 	// Fetch total count for metadata
 	var total int64
 	if err := db.Model(&models.User{}).Where("LOWER(first_name) LIKE ?", "%"+strings.ToLower(keyword)+"%").Count(&total).Error; err != nil {
-		utils.LogError("Failed to count records", err)
+		utils.LogError("QueryUpdates", "Failed to count records", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Failed to fetch records count",
 		})
 		return
 	}
+
+	// Log successful operation
+	utils.LogInfo("QueryUpdates", fmt.Sprintf("Successfully fetched %d records for keyword: %s, page: %d, limit: %d", len(results), keyword, page, limit))
 
 	// Return results with pagination metadata
 	ctx.JSON(http.StatusOK, gin.H{
@@ -247,6 +264,8 @@ func (s *Service) QueryUpdates(ctx *gin.Context) {
 			"total": total,
 		},
 	})
+	// Log response details
+	utils.LogInfo("QueryUpdates", fmt.Sprintf("Response sent with total records: %d for keyword: %s", total, keyword))
 }
 
 func (s *Service) AddRecord(ctx *gin.Context) {
@@ -254,6 +273,10 @@ func (s *Service) AddRecord(ctx *gin.Context) {
 
 	// Parse the JSON body into the User struct
 	if err := ctx.ShouldBindJSON(&user); err != nil {
+
+		log.Warn("Invalid request body", map[string]interface{}{
+			"error": err.Error(),
+		})
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Invalid request body",
@@ -262,9 +285,12 @@ func (s *Service) AddRecord(ctx *gin.Context) {
 		return
 	}
 
+	utils.LogInfo("AddRecord", "Attempting to insert record")
+
 	// Insert the record into the database
 	err := s.Repo.InsertRecord(ctx, &user)
 	if err != nil {
+		utils.LogError("AddRecord", "Failed to add record to database", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": "Failed to add record",
@@ -273,6 +299,8 @@ func (s *Service) AddRecord(ctx *gin.Context) {
 		return
 	}
 
+	// Log successful insertion
+	utils.LogInfo("AddRecord", "Record added successfully")
 	// Respond with success
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -285,6 +313,11 @@ func (s *Service) DeleteRecord(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+
+		log.Warn("Invalid ID format", map[string]interface{}{
+			"id":    idStr,
+			"error": err.Error(),
+		})
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Invalid ID format",
@@ -292,15 +325,22 @@ func (s *Service) DeleteRecord(ctx *gin.Context) {
 		return
 	}
 
+	utils.LogInfo("DeleteRecord", fmt.Sprintf("Attempting to delete record with ID: %d", id))
+
 	// Call the repository function to delete the record
 	err = s.Repo.DeleteRecord(ctx, id)
 	if err != nil {
 		if err.Error() == "record not found" {
+			log.Warn("Record not found", map[string]interface{}{
+				"id": id,
+			})
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"status":  "error",
 				"message": "Record not found",
 			})
 		} else {
+			// Log and respond to unexpected errors
+			utils.LogError("DeleteRecord", "Failed to delete record", fmt.Errorf("id: %d, error: %s", id, err.Error()))
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"status":  "error",
 				"message": "Failed to delete record",
@@ -309,6 +349,9 @@ func (s *Service) DeleteRecord(ctx *gin.Context) {
 		return
 	}
 
+	// Log successful deletion
+	utils.LogInfo("DeleteRecord", "Record deleted successfully")
+
 	// Respond with success if the deletion was successful
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -316,9 +359,9 @@ func (s *Service) DeleteRecord(ctx *gin.Context) {
 	})
 }
 
-func (s *Service) GetLogs(ctx *gin.Context) {
-	// Implementation
-}
+// func (s *Service) GetLogs(ctx *gin.Context) {
+// 	// Implementation
+// }
 
 // Helper function to parse integers safely
 func parseInt(str string) int {
