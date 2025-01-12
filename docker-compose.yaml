@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: csv_microservice
+    ports:
+      - "8081:8081"
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: Welcome@@1234
+      DB_NAME: test
+    # volumes:
+    #   - .:/app
+    # volumes:
+    #   - ./db/fixlets.csv:/app/db/fixlets.csv  
+    command: ["./main"]
+
+  db:
+    image: postgres:15
+    container_name: postgres_csv_microservice
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Welcome@@1234
+      POSTGRES_DB: test
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin_new
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+
+volumes:
+  db_data:
