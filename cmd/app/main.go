@@ -17,7 +17,7 @@ func main() {
 
 	// Connect to PostgreSQL
 	// dbConnectionString := config.GetDBConnectionString()
-	dbConnectionString := `host=localhost user=postgres password=Welcome@@1234 dbname=test port=5432 sslmode=disable TimeZone=Asia/Kolkata`
+	dbConnectionString := `host=db user=postgres password=Welcome@@1234 dbname=test port=5432 sslmode=disable TimeZone=Asia/Kolkata`
 	// db, err := gorm.Open(postgres.Open(dbConnectionString), &gorm.Config{})
 	// if err != nil {
 	// 	log.Fatalf("Failed to connect to database: %v", err)
@@ -39,6 +39,6 @@ func main() {
 	routes.RegisterRoutes(router, controller)
 
 	// Start server
-	log.Println("Server running on http://127.0.0.1:8080")
-	router.Run(":8080")
+	log.Println("Server running on http://127.0.0.1:8081")
+	router.Run(":8081")
 }
