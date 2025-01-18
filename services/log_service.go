@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
-var logs []logrus.Entry
+var Log []logrus.Entry
 
 // Initialize logger
 // func InitLogger() {
@@ -20,11 +21,20 @@ var logs []logrus.Entry
 // 	log.SetLevel(logrus.InfoLevel)
 // }
 
+func ResetLogs() {
+	Log = []logrus.Entry{}
+}
+
+// GetLogsSlice returns the current logs (used for testing purposes).
+func GetLogsSlice() []logrus.Entry {
+	return Log
+}
+
 // Log an entry
 func LogEntry(level, source, message string) {
 	entry := logrus.Entry{
 		Time:  time.Now(),
-		Level: parseLogLevel(level),
+		Level: ParseLogLevel(level),
 		// Data:    logrus.Fields{"source": source},
 		Message: message,
 		Data: map[string]interface{}{
@@ -34,7 +44,7 @@ func LogEntry(level, source, message string) {
 	// logLevel, _ := logrus.ParseLevel(level)
 	// entry.Level = logLevel
 	// log.WithFields(entry.Data).Log(logLevel, message)
-	logs = append(logs, entry)
+	Log = append(Log, entry)
 	utils.Logger.WithFields(entry.Data).Log(entry.Level, message)
 }
 
@@ -59,12 +69,16 @@ func GetLogs(c *gin.Context) {
 	scanner := bufio.NewScanner(logFile)
 	for scanner.Scan() {
 		line := scanner.Text()
-		entry, parseErr := parseLogLine(line)
-		fmt.Println(parseErr)
-		if parseErr == nil {
-			logs = append(logs, entry)
-			fmt.Println(entry)
+		entry, parseErr := ParseLogLine(line)
+		if parseErr != nil {
+			utils.LogError("GetLogs", "Failed to parse log line", parseErr)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Failed to parse logs",
+			})
+			return
 		}
+		Log = append(Log, entry)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -77,43 +91,45 @@ func GetLogs(c *gin.Context) {
 	}
 
 	// Filter logs by date range and level
-	filteredLogs := filterLogs(start, end, level)
+	filteredLogs := FilterLogs(start, end, level)
 	c.JSON(http.StatusOK, gin.H{
 		"logs": filteredLogs,
 	})
 }
 
 // Filter logs based on date range and log level
-func filterLogs(start, end, level string) []logrus.Entry {
+func FilterLogs(start, end, level string) []logrus.Entry {
 	fmt.Println("Filtering logs")
+	// fmt.Printf("Start: %s, End: %s, Level: %s\n", start, end, level)
 	var filtered []logrus.Entry
-	for _, log := range logs {
-		fmt.Println(log.Time)
+	for _, log := range Log {
+		// fmt.Println("Log Entry Time:", log.Time, "Level:", log.Level)
 		if level != "" && log.Level.String() != level {
 			continue
 		}
 
-		if start != "" && log.Time.Before(parseDate(start)) {
+		if start != "" && log.Time.Before(ParseDate(start)) {
 			continue
 		}
 
-		if end != "" && log.Time.After(parseDate(end)) {
+		if end != "" && log.Time.After(ParseDate(end)) {
 			continue
 		}
 
 		filtered = append(filtered, log)
 	}
+	// fmt.Println("f: ", filtered)
 	return filtered
 }
 
 // Helper function to parse date strings
-func parseDate(dateStr string) time.Time {
+func ParseDate(dateStr string) time.Time {
 	parsed, _ := time.Parse("2006-01-02", dateStr)
 	return parsed
 }
 
 // Parse log level safely
-func parseLogLevel(level string) logrus.Level {
+func ParseLogLevel(level string) logrus.Level {
 	parsed, err := logrus.ParseLevel(level)
 	if err != nil {
 		return logrus.InfoLevel // Default to INFO
@@ -121,19 +137,12 @@ func parseLogLevel(level string) logrus.Level {
 	return parsed
 }
 
-// func parseLogLine(line string) (logrus.Entry, error) {
-// 	var entry logrus.Entry
-// 	err := json.Unmarshal([]byte(line), &entry)
-// 	fmt.Println("Error: ", err)
-// 	if err != nil {
-// 		return logrus.Entry{}, err
-// 	}
-// 	return entry, nil
-// }
-
-func parseLogLine(line string) (logrus.Entry, error) {
+func ParseLogLine(line string) (logrus.Entry, error) {
 	var entry logrus.Entry
 
+	if !strings.Contains(line, "level=") || !strings.Contains(line, "msg=") {
+		return logrus.Entry{}, fmt.Errorf("invalid log line format: %s", line)
+	}
 	// Parse the log line manually
 	var timeStr, level, msg, source string
 	_, err := fmt.Sscanf(line, `time=%q level=%s msg=%q source=%s`, &timeStr, &level, &msg, &source)
@@ -141,6 +150,7 @@ func parseLogLine(line string) (logrus.Entry, error) {
 		return logrus.Entry{}, err
 	}
 
+	// Example: Parsing logic using a regex or JSON unmarshalling.
 	// Parse time
 	parsedTime, timeErr := time.Parse(time.RFC3339, timeStr)
 	if timeErr != nil {
