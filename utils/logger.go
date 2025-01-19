@@ -25,7 +25,7 @@ func InitLogger() {
 
 // LogError logs an error message
 func LogError(source, message string, err error) {
-	logrus.WithFields(logrus.Fields{
+	Logger.WithFields(logrus.Fields{
 		"source": source,
 		"error":  err,
 	}).Error(message)
