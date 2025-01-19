@@ -1,4 +1,10 @@
-time="2025-01-19T16:28:16+05:30" level=info msg="Request received with keyword: Emily, page: 1, limit: 100" source=QueryUpdates
-time="2025-01-19T16:28:16+05:30" level=info msg="Successfully fetched 0 records for keyword: Emily, page: 1, limit: 100" source=QueryUpdates
-time="2025-01-19T16:28:16+05:30" level=info msg="Response sent with total records: 0 for keyword: Emily" source=QueryUpdates
-
+time="2025-01-19T21:56:10+05:30" level=info msg="Attempting to delete record with ID: 2638" source=DeleteRecord
+time="2025-01-19T21:56:10+05:30" level=info msg="Record deleted successfully" source=DeleteRecord
+time="2025-01-19T21:56:17+05:30" level=info msg="Attempting to insert record" source=AddRecord
+time="2025-01-19T21:56:17+05:30" level=info msg="Record added successfully" source=AddRecord
+19T21:37:23+05:30" level=info msg="Incoming request with page: 1, limit: 10" source=ListEntriesByPages
+time="2025-01-19T21:37:44+05:30" level=info msg="Successfully fetched 10 entries for page: 1 with limit: 10" source=ListEntriesByPages
+time="2025-01-19T21:37:44+05:30" level=info msg="Response sent for page: 1, limit: 10 with total count: 268435456" source=ListEntriesByPages
+time="2025-01-19T21:40:36+05:30" level=info msg="Request received with keyword: Emily, page: 1, limit: 100" source=QueryUpdates
+time="2025-01-19T21:41:45+05:30" level=info msg="Successfully fetched 100 records for keyword: Emily, page: 1, limit: 100" source=QueryUpdates
+time="2025-01-19T21:41:45+05:30" level=info msg="Response sent with total records: 26832608 for keyword: Emily" source=QueryUpdates
