@@ -1,10 +1,1 @@
-time="2025-01-18T22:35:24+05:30" level=info msg="Received file: read-error.csv" source=UploadCSV
-time="2025-01-18T22:35:24+05:30" level=info msg="File processed successfully: read-error.csv" source=UploadCSV
--01-18T22:33:12+05:30" level=info msg="Received file: invalid.txt" source=UploadCSV
-time="2025-01-18T22:33:12+05:30" level=warning msg="Invalid file format: invalid.txt" source=UploadCSV
-time="2025-01-18T22:33:12+05:30" level=info msg="Received file: empty.csv" source=UploadCSV
-time="2025-01-18T22:33:12+05:30" level=info msg="File processed successfully: empty.csv" source=UploadCSV
-time="2025-01-18T22:33:12+05:30" level=info msg="Received file: malformed.csv" source=UploadCSV
-time="2025-01-18T22:33:12+05:30" level=info msg="File processed successfully: malformed.csv" source=UploadCSV
-time="2025-01-18T22:33:12+05:30" level=info msg="Received file: read-error.csv" source=UploadCSV
-time="2025-01-18T22:33:12+05:30" level=info msg="File processed successfully: read-error.csv" source=UploadCSV
+time="invalid_time" level=info msg="Test log" source=source

@@ -53,6 +53,10 @@ func processRecords(recordChan <-chan []string, batchSize int, s *Service, wg *s
 	var batch []models.User
 
 	for record := range recordChan {
+		if len(record) < 11 {
+			logs.Warn("Skipping malformed record: ", record)
+			continue
+		}
 		recordData := models.User{
 			Id:         parseInt(record[0]),
 			FirstName:  record[1],
