@@ -2,6 +2,8 @@ package services
 
 import (
 	"bytes"
+	"fmt"
+
 	// "csv-microservice/services"
 	"csv-microservice/utils"
 	"net/http"
@@ -40,27 +42,34 @@ func TestLogEntry(t *testing.T) {
 
 // TestGetLogs_Success tests GetLogs API success scenario.
 func TestGetLogs_Success(t *testing.T) {
+	// ResetLogs()
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	router.GET("/logs", GetLogs)
 
 	// Mock log file
+
+	// Mock log file
 	logContent := `time="2023-01-01T00:00:00Z" level=info msg="Test log 1" source=testSource1
 time="2023-01-02T00:00:00Z" level=warn msg="Test log 2" source=testSource2`
-	tempFile, err := os.CreateTemp("", "logs.log")
+
+	tempFile, err := os.CreateTemp("", "test_logs*.log")
 	assert.NoError(t, err)
 	defer os.Remove(tempFile.Name())
-	_, _ = tempFile.WriteString(logContent)
+	_, writeErr := tempFile.WriteString(logContent)
+	assert.NoError(t, writeErr)
 	tempFile.Close()
 
 	// Set up test
 	os.Rename(tempFile.Name(), "logs.log")
+	assert.NoError(t, err)
 	defer os.Remove("logs.log")
 
 	req, _ := http.NewRequest("GET", "/logs?start=2023-01-01&end=2023-01-02&level=info", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
+	fmt.Println("Response Body:", w.Body.String())
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "Test log 1")
 	assert.NotContains(t, w.Body.String(), "Test log 2")
@@ -68,9 +77,17 @@ time="2023-01-02T00:00:00Z" level=warn msg="Test log 2" source=testSource2`
 
 // TestGetLogs_FileNotFound tests the scenario where the log file is missing.
 func TestGetLogs_FileNotFound(t *testing.T) {
+	ResetLogs()
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	router.GET("/logs", GetLogs)
+
+	// Ensure that the logs file doesn't exist before running the test
+	// Safely remove the log file if it exists
+	if _, err := os.Stat("logs.log"); !os.IsNotExist(err) {
+		err := os.Remove("logs.log")
+		assert.NoError(t, err) // Ensure there's no error when trying to remove the file
+	}
 
 	req, _ := http.NewRequest("GET", "/logs", nil)
 	w := httptest.NewRecorder()
@@ -78,7 +95,7 @@ func TestGetLogs_FileNotFound(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Contains(t, w.Body.String(), "Failed to read logs")
+	assert.Contains(t, w.Body.String(), "Log file not found")
 }
 
 func TestFilterLogs(t *testing.T) {
@@ -150,36 +167,6 @@ func TestParseLogLine_Invalid(t *testing.T) {
 	_, err := ParseLogLine(logLine)
 	assert.Error(t, err)
 }
-
-// TestGetLogs_ScannerError tests GetLogs for scanner errors.
-// func TestGetLogs_ScannerError(t *testing.T) {
-// 	gin.SetMode(gin.TestMode)
-// 	ResetLogs()
-// 	router := gin.Default()
-// 	router.GET("/logs", GetLogs)
-
-// 	// Mock a file with invalid lines to trigger scanner errors
-// 	logContent := `time="invalid" level=info msg="Test log" source=source`
-// 	tempFile, err := os.CreateTemp("", "logs.log")
-// 	assert.NoError(t, err)
-// 	defer os.Remove(tempFile.Name())
-
-// 	_, _ = tempFile.WriteString(logContent)
-// 	tempFile.Close()
-
-// 	// Rename to match expected log file
-// 	os.Rename(tempFile.Name(), "logs.log")
-// 	defer os.Remove("logs.log")
-
-// 	// Make a GET request to fetch logs
-// 	req, _ := http.NewRequest("GET", "/logs", nil)
-// 	w := httptest.NewRecorder()
-// 	router.ServeHTTP(w, req)
-
-// 	// Validate response
-// 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-// 	assert.Contains(t, w.Body.String(), "Failed to parse logs")
-// }
 
 func TestGetLogs_ScannerError(t *testing.T) {
 	gin.SetMode(gin.TestMode)

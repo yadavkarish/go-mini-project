@@ -56,6 +56,18 @@ func GetLogs(c *gin.Context) {
 
 	logFile, err := os.Open("logs.log")
 	if err != nil {
+
+		// If the file doesn't exist, return a specific error message
+		if os.IsNotExist(err) {
+			utils.LogError("GetLogs", "Log file not found", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Log file not found",
+			})
+			return
+		}
+
+		// If it's any other error, log it as a failure to open the file
 		utils.LogError("GetLogs", "Failed to open log file", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -65,7 +77,7 @@ func GetLogs(c *gin.Context) {
 	}
 	defer logFile.Close()
 
-	// var logs []logrus.Entry
+	Log = []logrus.Entry{}
 	scanner := bufio.NewScanner(logFile)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -124,7 +136,10 @@ func FilterLogs(start, end, level string) []logrus.Entry {
 
 // Helper function to parse date strings
 func ParseDate(dateStr string) time.Time {
-	parsed, _ := time.Parse("2006-01-02", dateStr)
+	parsed, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		fmt.Println("Error parsing date:", err)
+	}
 	return parsed
 }
 
@@ -141,26 +156,27 @@ func ParseLogLine(line string) (logrus.Entry, error) {
 	var entry logrus.Entry
 
 	if !strings.Contains(line, "level=") || !strings.Contains(line, "msg=") {
+		fmt.Printf("Skipping line (invalid format): %s\n", line)
 		return logrus.Entry{}, fmt.Errorf("invalid log line format: %s", line)
 	}
 	// Parse the log line manually
 	var timeStr, level, msg, source string
 	_, err := fmt.Sscanf(line, `time=%q level=%s msg=%q source=%s`, &timeStr, &level, &msg, &source)
 	if err != nil {
-		return logrus.Entry{}, err
+		return logrus.Entry{}, fmt.Errorf("failed to parse log line: %v", err)
 	}
 
 	// Example: Parsing logic using a regex or JSON unmarshalling.
 	// Parse time
 	parsedTime, timeErr := time.Parse(time.RFC3339, timeStr)
 	if timeErr != nil {
-		return logrus.Entry{}, timeErr
+		return logrus.Entry{}, fmt.Errorf("failed to parse time: %v", timeErr)
 	}
 
 	// Parse log level
 	parsedLevel, levelErr := logrus.ParseLevel(level)
 	if levelErr != nil {
-		return logrus.Entry{}, levelErr
+		return logrus.Entry{}, fmt.Errorf("failed to parse log level: %v", levelErr)
 	}
 
 	// Create logrus.Entry
