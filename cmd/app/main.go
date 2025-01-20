@@ -1,27 +1,33 @@
 package main
 
 import (
+	"csv-microservice/config"
 	"csv-microservice/controllers"
 	repository "csv-microservice/repositories"
 	"csv-microservice/routes"
 	"csv-microservice/services"
 	"csv-microservice/utils"
+	"fmt"
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file
+	err := godotenv.Load("../../.env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
 	// Initialize logger
 	utils.InitLogger()
 
 	// Connect to PostgreSQL
-	// dbConnectionString := config.GetDBConnectionString()
-	dbConnectionString := `host=db user=postgres password=Welcome@@1234 dbname=test port=5432 sslmode=disable TimeZone=Asia/Kolkata`
-	// db, err := gorm.Open(postgres.Open(dbConnectionString), &gorm.Config{})
-	// if err != nil {
-	// 	log.Fatalf("Failed to connect to database: %v", err)
-	// }
+	dbConnectionString := config.GetDBConnectionString()
+	fmt.Println(dbConnectionString)
+	// dbConnectionString := `host=localhost user=postgres password=Welcome@@1234 dbname=test port=5432 sslmode=disable TimeZone=Asia/Kolkata`
 
 	db := services.InitializeDatabase(dbConnectionString)
 	// Initialize database (apply migrations, etc.)

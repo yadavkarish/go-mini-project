@@ -35,7 +35,7 @@ type Service struct {
 }
 
 var db *gorm.DB
-var log = logrus.New()
+var logs = logrus.New()
 
 // Initialize PostgreSQL DB connection (Using GORM)
 func InitDatabase(database *gorm.DB) {
@@ -53,6 +53,10 @@ func processRecords(recordChan <-chan []string, batchSize int, s *Service, wg *s
 	var batch []models.User
 
 	for record := range recordChan {
+		if len(record) < 11 {
+			logs.Warn("Skipping malformed record: ", record)
+			continue
+		}
 		recordData := models.User{
 			Id:         parseInt(record[0]),
 			FirstName:  record[1],
@@ -72,7 +76,7 @@ func processRecords(recordChan <-chan []string, batchSize int, s *Service, wg *s
 		// Insert batch when size limit is reached
 		if len(batch) >= batchSize {
 			if err := s.Repo.BulkInsert(batch); err != nil {
-				log.Error("Error during batch insertion: ", err)
+				logs.Error("Error during batch insertion: ", err)
 			}
 			batch = batch[:0] // Clear the batch
 		}
@@ -81,7 +85,7 @@ func processRecords(recordChan <-chan []string, batchSize int, s *Service, wg *s
 	// Insert remaining records
 	if len(batch) > 0 {
 		if err := s.Repo.BulkInsert(batch); err != nil {
-			log.Error("Error during final batch insertion: ", err)
+			logs.Error("Error during final batch insertion: ", err)
 		}
 	}
 }
@@ -274,7 +278,7 @@ func (s *Service) AddRecord(ctx *gin.Context) {
 	// Parse the JSON body into the User struct
 	if err := ctx.ShouldBindJSON(&user); err != nil {
 
-		log.Warn("Invalid request body", map[string]interface{}{
+		logs.Warn("Invalid request body", map[string]interface{}{
 			"error": err.Error(),
 		})
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -314,7 +318,7 @@ func (s *Service) DeleteRecord(ctx *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 
-		log.Warn("Invalid ID format", map[string]interface{}{
+		logs.Warn("Invalid ID format", map[string]interface{}{
 			"id":    idStr,
 			"error": err.Error(),
 		})
@@ -331,7 +335,7 @@ func (s *Service) DeleteRecord(ctx *gin.Context) {
 	err = s.Repo.DeleteRecord(ctx, id)
 	if err != nil {
 		if err.Error() == "record not found" {
-			log.Warn("Record not found", map[string]interface{}{
+			logs.Warn("Record not found", map[string]interface{}{
 				"id": id,
 			})
 			ctx.JSON(http.StatusNotFound, gin.H{
